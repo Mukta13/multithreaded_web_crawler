@@ -1,9 +1,13 @@
 package com.webcrawler;
 
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 /**
  * Hello world!
@@ -15,7 +19,7 @@ public class App {
 
         SimpleCrawler crawler = new SimpleCrawler();
 
-        System.out.println(crawler.fetchPage("https://crawler-test.com/"));
+        System.out.println(crawler.parseDocument(crawler.fetchPage("https://crawler-test.com/")));
     }
 
 }
@@ -39,4 +43,18 @@ class SimpleCrawler {
 
         return document;
     }
+
+    public List<String> parseDocument(Document document) {
+
+        ArrayList<String> links = new ArrayList<String>();
+
+        Elements urls = document.select("a[href]:not([rel=nofollow])");
+
+        for (Element url : urls) {
+            links.add(url.attr("abs:href"));
+        }
+
+        return links;
+    }
+
 }
