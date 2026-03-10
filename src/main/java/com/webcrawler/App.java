@@ -1,8 +1,7 @@
 package com.webcrawler;
 
 import java.io.IOException;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -55,6 +54,32 @@ class SimpleCrawler {
         }
 
         return links;
+    }
+
+    public List<String> crawl(String startUrl) {
+
+        HashSet<String> visited = new HashSet<>();
+
+        Queue<String> queue = new LinkedList<>();
+
+        visited.add(startUrl);
+
+        queue.offer(startUrl);
+
+        while (!queue.isEmpty()) {
+            String url = queue.poll();
+
+            List<String> list = parseDocument(fetchPage(url));
+            for (String nextUrl : list) {
+                if (!visited.contains(nextUrl)) {
+                    visited.add(nextUrl);
+                    queue.offer(nextUrl);
+                }
+            }
+
+        }
+        return new ArrayList<>(visited);
+
     }
 
 }
