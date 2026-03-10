@@ -1,7 +1,11 @@
 package com.webcrawler;
 
-import java.io.IOException;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -18,7 +22,7 @@ public class App {
 
         SimpleCrawler crawler = new SimpleCrawler();
 
-        System.out.println(crawler.parseDocument(crawler.fetchPage("https://crawler-test.com/")));
+        crawler.crawl("https://crawler-test.com/");
     }
 
 }
@@ -58,26 +62,44 @@ class SimpleCrawler {
 
     public List<String> crawl(String startUrl) {
 
-        HashSet<String> visited = new HashSet<>();
+        Set<String> visited = ConcurrentHashMap.newKeySet();
 
-        Queue<String> queue = new LinkedList<>();
+        Queue<String> queue = new ConcurrentLinkedQueue<>();
+
+        AtomicInteger activeTasks = new AtomicInteger(0);
+
+        ExecutorService executor = Executors.newFixedThreadPool(10);
 
         visited.add(startUrl);
 
         queue.offer(startUrl);
 
-        while (!queue.isEmpty()) {
+        activeTasks.incrementAndGet();
+
+        while (activeTasks.get() > 0) {
             String url = queue.poll();
 
-            List<String> list = parseDocument(fetchPage(url));
-            for (String nextUrl : list) {
-                if (!visited.contains(nextUrl)) {
-                    visited.add(nextUrl);
-                    queue.offer(nextUrl);
-                }
+            if (url != null) {
+                executor.submit(() -> {
+                    try {
+                        System.out.println(Thread.currentThread().getName() + " is fetching: " + url);
+                        List<String> list = parseDocument(fetchPage(url));
+                        for (String nextUrl : list) {
+                            if (!visited.contains(nextUrl)) {
+                                visited.add(nextUrl);
+                                queue.offer(nextUrl);
+                                activeTasks.incrementAndGet();
+                            }
+                        }
+
+                    } finally {
+                        activeTasks.decrementAndGet();
+                    }
+                });
             }
 
         }
+        executor.shutdown();
         return new ArrayList<>(visited);
 
     }
