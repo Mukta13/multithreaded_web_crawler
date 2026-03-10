@@ -51,7 +51,8 @@ class SimpleCrawler {
 
         ArrayList<String> links = new ArrayList<String>();
 
-        Elements urls = document.select("a[href]:not([rel=nofollow])");
+        Elements urls = document.select("a[href]:not([rel=nofollow])"); // rel - nofollow means to not extract this url
+                                                                        // for webcrawling
 
         for (Element url : urls) {
             links.add(url.attr("abs:href"));
@@ -62,13 +63,15 @@ class SimpleCrawler {
 
     public List<String> crawl(String startUrl) {
 
-        Set<String> visited = ConcurrentHashMap.newKeySet();
+        Set<String> visited = ConcurrentHashMap.newKeySet(); // no concurrent hash set thus use concurrent hashmap as
+                                                             // hash set
 
         Queue<String> queue = new ConcurrentLinkedQueue<>();
 
-        AtomicInteger activeTasks = new AtomicInteger(0);
+        AtomicInteger activeTasks = new AtomicInteger(0); // for concurrent thread safety do not use int directly
 
-        ExecutorService executor = Executors.newFixedThreadPool(10);
+        ExecutorService executor = Executors.newFixedThreadPool(10); // creates a fixed thread pool of 10 threads so
+                                                                     // that we can crawl concurrently
 
         visited.add(startUrl);
 
@@ -79,8 +82,9 @@ class SimpleCrawler {
         while (activeTasks.get() > 0) {
             String url = queue.poll();
 
-            if (url != null) {
-                executor.submit(() -> {
+            if (url != null) { // need this check to avoid NPE if multithreads access the last element in the
+                               // queue in a short interval of time
+                executor.submit(() -> { // submit the task to the executor service
                     try {
                         System.out.println(Thread.currentThread().getName() + " is fetching: " + url);
                         List<String> list = parseDocument(fetchPage(url));
@@ -92,7 +96,8 @@ class SimpleCrawler {
                             }
                         }
 
-                    } finally {
+                    } finally { // finally block to ensure that the activeTasks counter is decremented even if
+                                // an exception occurs
                         activeTasks.decrementAndGet();
                     }
                 });
