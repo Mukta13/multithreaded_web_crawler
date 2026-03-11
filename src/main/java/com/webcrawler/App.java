@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
@@ -22,7 +23,7 @@ public class App {
 
         SimpleCrawler crawler = new SimpleCrawler();
 
-        crawler.crawl("https://crawler-test.com/");
+        crawler.crawlWithLocks("https://crawler-test.com/");
     }
 
 }
@@ -105,6 +106,82 @@ class SimpleCrawler {
 
         }
         executor.shutdown();
+        return new ArrayList<>(visited);
+
+    }
+
+    public List<String> crawlWithLocks(String startUrl) {
+
+        Set<String> visited = new HashSet<>();
+
+        Queue<String> queue = new LinkedList<>();
+
+        ReentrantLock lock = new ReentrantLock();
+
+        AtomicInteger activeTasks = new AtomicInteger(0);
+
+        ExecutorService executor = Executors.newFixedThreadPool(10);
+
+        lock.lock();
+
+        try {
+
+            visited.add(startUrl);
+            queue.offer(startUrl);
+            activeTasks.incrementAndGet();
+
+        } finally {
+            lock.unlock();
+        }
+
+        while (activeTasks.get() > 0) {
+
+            String url = null;
+
+            lock.lock();
+
+            try {
+                url = queue.poll();
+
+            } finally {
+                lock.unlock();
+            }
+
+            final String currUrl = url;
+
+            if (currUrl != null) { // need this check to avoid NPE if multithreads access the last element in the
+                // queue in a short interval of time
+                executor.submit(() -> { // submit the task to the executor service
+                    try {
+                        System.out.println(Thread.currentThread().getName() + " is fetching: " + currUrl);
+                        List<String> list = parseDocument(fetchPage(currUrl));
+
+                        lock.lock();
+                        try {
+                            for (String nextUrl : list) {
+                                if (!visited.contains(nextUrl)) {
+                                    visited.add(nextUrl);
+                                    queue.offer(nextUrl);
+                                    activeTasks.incrementAndGet();
+                                }
+
+                            }
+
+                        } finally {
+                            lock.unlock();
+                        }
+
+                    } finally { // finally block to ensure that the activeTasks counter is decremented even if
+                                // an exception occurs
+                        activeTasks.decrementAndGet();
+                    }
+                });
+            }
+
+        }
+
+        executor.shutdown();
+
         return new ArrayList<>(visited);
 
     }
